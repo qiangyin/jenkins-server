@@ -1,0 +1,71 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.17">
+    <description></description>
+    <keepDependencies>false</keepDependencies>
+    <properties/>
+    <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.45">
+        <script>pipeline {
+            agent any
+            tools {
+            maven &apos;M3&apos;
+            jdk &apos;JDK1.8&apos;
+            }
+            stages {
+            stage(&quot;download code&quot;) {
+            steps {
+            echo &quot;start download code from gitlable server: ${CodeUrl}&quot;
+            git url: &quot;${CodeUrl}&quot;, credentialsId: &quot;gitlab&quot;, branch: &quot;${CodeBranch}&quot;
+            echo &quot;complete download code from gitlable server: ${CodeUrl}&quot;
+            }
+            }
+            stage(&apos;compile code&apos;) {
+            steps {
+            sh &quot;mvn clean install -Dmaven.test.skip=true -U&quot;
+            }
+            }
+            stage(&quot;build dockerfile&quot;) {
+            steps {
+            echo &quot;start generate dockerfile&quot;
+            sh &quot;rm -f Dockerfile&quot;
+            sh &quot;touch Dockerfile&quot;
+            sh &quot;echo &apos;FROM ${BaseImage}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;MAINTAINER ${ImageUser}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;WORKDIR /data/springboot&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;ADD ${JarPath}/${JarName} /${JarName}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;EXPOSE ${ExposePort}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;CMD [\&quot;java\&quot;,\&quot;-jar\&quot;,\&quot;/${JarName}\&quot;]&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;tail Dockerfile&quot;
+            }
+            }
+            stage(&quot;build images&quot;) {
+            steps {
+            echo &quot;start build images&quot;
+            sh &quot;/root/local/bin/docker build -t 10.112.101.90/${RepositoryUrl}/${ImageName} .&quot;
+            echo &quot;complete build images&quot;
+            }
+            }
+            stage(&quot;push image&quot;) {
+            steps {
+            echo &quot;start push image&quot;
+            sh &quot;/root/local/bin/docker login 10.112.101.90/${RepositoryUrl} -u ${RepositoryUsername} -p ${RepositoryPassword}&quot;
+            sh &quot;/root/local/bin/docker push 10.112.101.90/${RepositoryUrl}/${ImageName}&quot;
+            echo &quot;complete push image&quot;
+            }
+            }
+            }
+            post {
+            success {
+            echo &apos;success update job status&apos;
+            sh &quot;curl http://${ConsoleURL}/api/v1/build/${env.JOB_NAME}/${env.BUILD_NUMBER}/status?status=success&quot;
+            }
+            failure {
+            echo &apos;error update job status&apos;
+            sh &quot;curl http://${ConsoleURL}/api/v1/build/${env.JOB_NAME}/${env.BUILD_NUMBER}/status?status=failed&quot;
+            }
+            }
+            }</script>
+        <sandbox>true</sandbox>
+    </definition>
+    <triggers/>
+    <disabled>false</disabled>
+</flow-definition>

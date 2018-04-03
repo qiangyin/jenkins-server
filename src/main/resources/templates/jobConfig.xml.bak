@@ -1,0 +1,85 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.17">
+    <description></description>
+    <keepDependencies>false</keepDependencies>
+    <properties/>
+    <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.45">
+        <script>pipeline {
+            agent any
+            parameters {
+            string(name: &apos;consoleURL&apos;, defaultValue: &apos;${ConsoleURL}&apos;)
+            string(name: &apos;codeBranch&apos;, defaultValue: &apos;${CodeBranch}&apos;)
+            string(name: &apos;gitLableUrl&apos;, defaultValue: &apos;${CodeUrl}&apos;)
+            string(name: &apos;baseImage&apos;, defaultValue: &apos;${BaseImage}&apos;)
+            string(name: &apos;imageUser&apos;, defaultValue: &apos;${ImageUser}&apos;)
+            string(name: &apos;imageName&apos;, defaultValue: &apos;${ImageName}&apos;)
+            string(name: &apos;imageRepositoryUrl&apos;, defaultValue: &apos;${RepositoryUrl}&apos;)
+            string(name: &apos;repositoryUsername&apos;, defaultValue: &apos;${RepositoryUsername}&apos;)
+            string(name: &apos;repositoryPassword&apos;, defaultValue: &apos;${RepositoryPassword}&apos;)
+            string(name: &apos;jarName&apos;, defaultValue: &apos;${JarName}&apos;)
+            string(name: &apos;jarPath&apos;, defaultValue: &apos;${JarPath}&apos;)
+            string(name: &apos;exposePort&apos;, defaultValue: &apos;${ExposePort}&apos;)
+            }
+            tools {
+            maven &apos;M3&apos;
+            jdk &apos;JDK1.8&apos;
+            }
+            stages {
+            stage(&quot;download code&quot;) {
+            steps {
+            echo &quot;start download code from gitlable server: ${params.gitLableUrl}&quot;
+            git url: &quot;${params.gitLableUrl}&quot;, credentialsId: &quot;gitlab&quot;, branch: &quot;${params.codeBranch}&quot;
+            echo &quot;complete download code from gitlable server: ${params.gitLableUrl}&quot;
+            }
+            }
+            stage(&apos;compile code&apos;) {
+            steps {
+            sh &quot;mvn clean install -Dmaven.test.skip=true -U&quot;
+            }
+            }
+            stage(&quot;build dockerfile&quot;) {
+            steps {
+            echo &quot;start generate dockerfile&quot;
+            sh &quot;rm -f Dockerfile&quot;
+            sh &quot;touch Dockerfile&quot;
+            sh &quot;echo &apos;FROM ${params.baseImage}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;MAINTAINER ${params.imageUser}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;WORKDIR /data/springboot&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;ADD ${params.jarPath}/${params.jarName} /${params.jarName}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;EXPOSE ${params.exposePort}&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;echo &apos;CMD [\&quot;java\&quot;,\&quot;-jar\&quot;,\&quot;/${params.jarName}\&quot;]&apos; &gt;&gt; Dockerfile&quot;
+            sh &quot;tail Dockerfile&quot;
+            }
+            }
+            stage(&quot;build images&quot;) {
+            steps {
+            echo &quot;start build images&quot;
+            sh &quot;/root/local/bin/docker build -t ${params.imageRepositoryUrl}/${params.imageName} .&quot;
+            echo &quot;complete build images&quot;
+            }
+            }
+            stage(&quot;push image&quot;) {
+            steps {
+            echo &quot;start push image&quot;
+            sh &quot;/root/local/bin/docker login ${params.imageRepositoryUrl} -u ${params.repositoryUsername} -p ${params.repositoryPassword}&quot;
+            sh &quot;/root/local/bin/docker push ${params.imageRepositoryUrl}/${params.imageName}&quot;
+            echo &quot;complete push image&quot;
+            }
+            }
+            }
+            post {
+            success {
+            echo &apos;success update job status&apos;
+            sh &quot;curl http://${params.consoleURL}/api/v1/build/${env.JOB_NAME}/${env.BUILD_NUMBER}/status?status=success&quot;
+            }
+            failure {
+            echo &apos;error update job status&apos;
+            sh &quot;curl http://${params.consoleURL}/api/v1/build/${env.JOB_NAME}/${env.BUILD_NUMBER}/status?status=failed&quot;
+            }
+            }
+            }</script>
+        <sandbox>true</sandbox>
+    </definition>
+    <triggers/>
+    <disabled>false</disabled>
+</flow-definition>
