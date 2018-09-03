@@ -40,15 +40,15 @@
             stage(&quot;build images&quot;) {
             steps {
             echo &quot;start build images&quot;
-            sh &quot;/root/local/bin/docker build -t 10.112.101.90/${RepositoryUrl}/${ImageName} .&quot;
+            sh &quot;/root/local/bin/docker build -t 192.168.101.90/${RepositoryUrl}/${ImageName} .&quot;
             echo &quot;complete build images&quot;
             }
             }
             stage(&quot;push image&quot;) {
             steps {
             echo &quot;start push image&quot;
-            sh &quot;/root/local/bin/docker login 10.112.101.90/${RepositoryUrl} -u ${RepositoryUsername} -p ${RepositoryPassword}&quot;
-            sh &quot;/root/local/bin/docker push 10.112.101.90/${RepositoryUrl}/${ImageName}&quot;
+            sh &quot;/root/local/bin/docker login 192.168.101.90/${RepositoryUrl} -u ${RepositoryUsername} -p ${RepositoryPassword}&quot;
+            sh &quot;/root/local/bin/docker push 192.168.101.90/${RepositoryUrl}/${ImageName}&quot;
             echo &quot;complete push image&quot;
             }
             }
